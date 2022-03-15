@@ -1,6 +1,6 @@
 #include "Vector.h"
 
-ArrayPtr createGenericArray(int initialLength, size_t elementSize)
+ArrayPtr CreateGenericArray(int initialLength, size_t elementSize)
 {
 	ArrayPtr newArr = malloc(sizeof(struct GenericArray));
 

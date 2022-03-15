@@ -10,6 +10,6 @@ struct GenericArray
 	int capacity;				// the amount of elements that the array can take
 };
 typedef struct GenericArray *ArrayPtr;
-ArrayPtr createGenericArray(int initialLength, size_t elementSize);
+ArrayPtr CreateGenericArray(int initialLength, size_t elementSize);
 void ArrPush(ArrayPtr array, void *newElement);
 void *GetArray(ArrayPtr array, int idx);
