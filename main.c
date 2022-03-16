@@ -13,6 +13,35 @@ void TestCommand(struct discord *client, const struct discord_message *msg)
 	printf("Someone sent this message: %s\n", msg->content);
 }
 
+void PingCommand(struct discord *client, const struct discord_message *msg)
+{
+	uint64_t currentTime = discord_timestamp(client);
+	uint64_t diff = currentTime - msg->timestamp;
+
+	char *response;
+	int stringLength = snprintf(response, 0, "The ping is: %lums", diff) + 1;
+	response = malloc(stringLength);
+	snprintf(response, stringLength, "The ping is: %lums", diff);
+
+	struct discord_embed embeds[] = {
+		{
+			.color = 177013,
+			.description = response,
+			.timestamp = currentTime,
+		}
+	};
+
+	struct discord_create_message params = {
+		.embeds = &(struct discord_embeds){
+			.size = sizeof(embeds) / sizeof *embeds,
+			.array = embeds,
+		}
+	};
+
+	discord_create_message(client, msg->channel_id, &params, NULL);
+	free(response);
+}
+
 void on_message_create(struct discord *client, const struct discord_message *msg)
 {
 	char **tokens = str_split(msg->content, " ");
@@ -31,6 +60,8 @@ void on_message_create(struct discord *client, const struct discord_message *msg
 			(*cmdHandler->function)(client, msg);
 			break;
 		}
+
+		free(fullThing);
 	}
 }
 
@@ -46,6 +77,7 @@ int main(int argc, char *argv[])
 
 	commands = CreateGenericArray(10, sizeof(CommandHandler));
 	AddCommandToCommandsList("testCommand", &TestCommand);
+	AddCommandToCommandsList("ping", &PingCommand);
 
 	discord_run(client);
 
