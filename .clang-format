@@ -1,3 +1,5 @@
 IndentWidth: 2
 TabWidth: 2
 UseTab: Always
+AllowShortIfStatementsOnASingleLine: AllIfsAndElse
+ColumnLimit: 0

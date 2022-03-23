@@ -1,79 +1,39 @@
-#include <assert.h>
+#include "curl.h"
+#include <concord/discord.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
-#include "CommandHandler.h"
-#include "strings.h"
-
-#define DEFAULT_PREFIX "!@#$"
-struct discord *client;
-
-void TestCommand(struct discord *client, const struct discord_message *msg) {
-		printf("Someone sent this message: %s\n", msg->content);
+void nhentai_command_callback(struct curl_write_cb *data) {
+	printf("The callback was called!\n");
+	discord_create_message(data->client, data->channel, &(struct discord_create_message){.content = data->buf}, NULL);
 }
 
-void PingCommand(struct discord *client, const struct discord_message *msg) {
-		uint64_t currentTime = discord_timestamp(client);
-		uint64_t diff = currentTime - msg->timestamp;
-
-		char *response;
-		int stringLength = snprintf(response, 0, "The ping is: %lums", diff) + 1;
-		response = malloc(stringLength);
-		snprintf(response, stringLength, "The ping is: %lums", diff);
-
-		struct discord_embed embeds[] = {
-						{
-										.color = 177013,
-										.description = response,
-										.timestamp = currentTime,
-						}};
-
-		struct discord_create_message params = {
-						.embeds = &(struct discord_embeds){
-										.size = sizeof(embeds) / sizeof *embeds,
-										.array = embeds,
-						}};
-
-		discord_create_message(client, msg->channel_id, &params, NULL);
-		free(response);
-}
-
-void on_message_create(struct discord *client, const struct discord_message *msg) {
-		char **tokens = str_split(msg->content, " ");
-		char *firstWord = *(tokens);
-
-		for (int idx = 0; idx < commands->length; idx++) {
-				CommandHandler *cmdHandler = GetArray(commands, idx);
-				char *cmdName = cmdHandler->name;
-				char *fullThing = malloc(strlen(DEFAULT_PREFIX) + strlen(cmdName) + 2);
-				strcpy(fullThing, DEFAULT_PREFIX);
-				strcat(fullThing, cmdName);
-
-				if (!strcmp(firstWord, fullThing)) {
-						(*cmdHandler->function)(client, msg);
-						break;
-				}
-
-				free(fullThing);
-		}
+static void nhentaiCommand(struct discord *client, const struct discord_message *msg) {
+	struct curl_write_cb *data = curl_write_cb_init(client, nhentai_command_callback, msg->channel_id);
+	CURL *easy = create_curl_easy_handle(client, msg->content, data);
 }
 
 int main(int argc, char *argv[]) {
-		const char *config_file = "./config.json";
+	ccord_global_init();
 
-		ccord_global_init();
-		client = discord_config_init(config_file);
-		assert(NULL != client && "Couldn't initialize client");
+	struct discord *client = discord_config_init(argc > 1 ? argv[1] : "config.json");
+	struct discord_data dd = {
+			.multi = curl_multi_init(),
+	};
+	discord_set_data(client, &dd);
+	io_poller_curlm_add(discord_get_io_poller(client), dd.multi, multi_cb, client);
 
-		discord_set_on_message_create(client, &on_message_create);
+	// add the command and start the client
+	discord_set_prefix(client, "!@#$");
+	discord_set_on_command(client, "nhentai", nhentaiCommand);
+	discord_run(client);
 
-		commands = CreateGenericArray(10, sizeof(CommandHandler));
-		AddCommandToCommandsList("testCommand", &TestCommand);
-		AddCommandToCommandsList("ping", &PingCommand);
-
-		discord_run(client);
-
-		discord_cleanup(client);
-		ccord_global_cleanup();
+	// cleanup of everything
+	io_poller_curlm_del(discord_get_io_poller(client), dd.multi);
+	curl_multi_cleanup(dd.multi);
+	discord_cleanup(client);
+	ccord_global_cleanup();
 }
